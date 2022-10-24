@@ -1,4 +1,4 @@
 # Utility Functions
 
-- Python >=3.7
+- Python >=3.6
 
