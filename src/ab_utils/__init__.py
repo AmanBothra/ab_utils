@@ -2,7 +2,7 @@
 =======
 Helpers
 =======
-Useful helper methods that frequently used in this project
+Useful helper methods that frequently used in projects
 """
 import collections
 from datetime import datetime, timedelta
@@ -161,13 +161,6 @@ def get_proper_file_name(file_name, extension):
     """
     return re.sub("[^A-z0-9 -]", "", file_name) + f".{extension}"
 
-
-def app_urlname(value, arg, user=None):
-    """Given model opts (model._meta) and a url name, return a named pattern.
-    URLs should be named as: customadmin:app_label:model_name-list"""
-
-    pattern = "%s:%s-%s" % (value.app_label, value.model_name, arg)
-    return pattern
 
 
 def get_upload_to_uuid(self, filename):
