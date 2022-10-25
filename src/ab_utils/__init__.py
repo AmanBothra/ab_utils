@@ -5,17 +5,20 @@ Helpers
 Useful helper methods that frequently used in this project
 """
 import collections
-import datetime
-import logging
+from datetime import datetime, timedelta
 import ntpath
 import re
-
+import os
+import uuid
 import pytz
+import random
+import string
+import time
+import base64
+import json
 
-L = logging.getLogger('app.' + __name__)
-
-first_cap_re = re.compile('(.)([A-Z][a-z]+)')
-all_cap_re = re.compile('([a-z0-9])([A-Z])')
+first_cap_re = re.compile("(.)([A-Z][a-z]+)")
+all_cap_re = re.compile("([a-z0-9])([A-Z])")
 
 
 def str2bool(v):
@@ -30,7 +33,19 @@ def str2bool(v):
         return False
 
 
-def prop2pair(cls, out='tuple', startswith_only=None):
+def string_validation(key):
+    """
+    Validate string does not contain any special characters
+    """
+    regex = re.compile("[@!#$%^&*()<>?/\|}{~:]")
+
+    if regex.search(key):
+        return False
+
+    return True
+
+
+def prop2pair(cls, out="tuple", startswith_only=None):
     """
     Iterates over each property of the cls and prepare the key-value pair
     :param cls: Class to be interated over
@@ -40,22 +55,26 @@ def prop2pair(cls, out='tuple', startswith_only=None):
     """
     if startswith_only is not None:
         d = {
-            getattr(cls, prop)[0]:
-                getattr(cls, prop)[1] if getattr(cls, prop)[1] else getattr(cls, prop)[0]
-            for prop in dir(cls) if prop.startswith(startswith_only) is True
+            getattr(cls, prop)[0]: getattr(cls, prop)[1]
+            if getattr(cls, prop)[1]
+            else getattr(cls, prop)[0]
+            for prop in dir(cls)
+            if prop.startswith(startswith_only) is True
         }
     else:
         d = {
-            getattr(cls, prop)[0]:
-                getattr(cls, prop)[1] if getattr(cls, prop)[1] else getattr(cls, prop)[0]
-            for prop in dir(cls) if prop.startswith('_') is False
+            getattr(cls, prop)[0]: getattr(cls, prop)[1]
+            if getattr(cls, prop)[1]
+            else getattr(cls, prop)[0]
+            for prop in dir(cls)
+            if prop.startswith("_") is False
         }
 
-    if out == 'tuple':
+    if out == "tuple":
         d = list(d.items())
         # Keep tuple consistent so when migration runs it won't detect its changes
         d.sort(key=lambda x: x[0])
-    elif out == 'list':
+    elif out == "list":
         return sorted(list(d.keys()))
 
     return d
@@ -81,8 +100,12 @@ def camel_to_snake_case(name):
     :param str name: String to be converted
     :return str: Converted string
     """
-    s1 = first_cap_re.sub(r'\1_\2', name)
-    return all_cap_re.sub(r'\1_\2', s1).lower().replace(' ', '_')
+    s1 = first_cap_re.sub(r"\1_\2", name)
+    return all_cap_re.sub(r"\1_\2", s1).lower().replace(" ", "_")
+
+
+def convert_into_dictionary(data):
+    return json.loads(json.dumps(data))
 
 
 def snake_case_to_title(s):
@@ -91,15 +114,15 @@ def snake_case_to_title(s):
     :param str s: String to be converted
     :return str: Converted string
     """
-    return s.replace('_', ' ').title().replace(' ', '')
+    return s.replace("_", " ").title().replace(" ", "")
 
 
 def strip_dict(d):
     return {k: v.strip() if isinstance(v, str) else v for k, v in d.items()}
 
 
-def utc_to_local_time(t, to_tz, fmt='%H:%M'):
-    utc_tz = pytz.timezone('UTC')
+def utc_to_local_time(t, to_tz, fmt="%H:%M"):
+    utc_tz = pytz.timezone("UTC")
     local_tz = pytz.timezone(to_tz)
 
     dt = datetime.datetime.combine(datetime.date.today(), t)
@@ -119,7 +142,7 @@ def path_leaf(path):
     return tail or ntpath.basename(head)
 
 
-def flatten_dict(d, parent_key='', sep='.'):
+def flatten_dict(d, parent_key="", sep="."):
     items = []
 
     for k, v in d.items():
@@ -132,39 +155,12 @@ def flatten_dict(d, parent_key='', sep='.'):
     return dict(items)
 
 
-class Constant:
-    pass
-
-
-class ConstMember(str):
-    def __new__(cls, value, *args, **kwargs):
-        # explicitly only pass value to the str constructor
-        return str.__new__(cls, value)
-
-    def __init__(self, value, help_text=''):
-        self.value = value
-        self.text = help_text
-
-    def __str__(self):
-        return self.value
-
-    def __iter__(self):
-        yield self.value
-        yield self.text
-
-    def __getitem__(self, item):
-        if item == 0:
-            return self.value
-        elif item == 1:
-            return self.text
-        else:
-            raise IndexError()
-
 def get_proper_file_name(file_name, extension):
     """
     Removes special charcter from filename
     """
     return re.sub("[^A-z0-9 -]", "", file_name) + f".{extension}"
+
 
 def app_urlname(value, arg, user=None):
     """Given model opts (model._meta) and a url name, return a named pattern.
@@ -172,3 +168,117 @@ def app_urlname(value, arg, user=None):
 
     pattern = "%s:%s-%s" % (value.app_label, value.model_name, arg)
     return pattern
+
+
+def get_upload_to_uuid(self, filename):
+    """Rename uploaded file to a unique name."""
+    basename = os.path.basename(filename)
+    ext = os.path.splitext(basename)[1].lower()
+    new_name = uuid.uuid4().hex
+    return os.path.join(self.upload_to, new_name + ext)
+
+
+def increment_date_time(value):
+    now = datetime.now()
+    now_plus = now + timedelta(minutes=value)
+    return now_plus
+
+
+def get_today_date():
+    return datetime.date.today()
+
+
+def get_now():
+    return datetime.now().time()
+
+
+def random_generator_code(size=6, chars=string.ascii_uppercase + string.digits):
+    return "".join(random.choice(chars) for x in range(size))
+
+
+def random_digit_generator(size=6, chars=string.digits):
+    return "".join(random.choice(chars) for x in range(size))
+
+
+def random_string():
+    string = datetime.now()
+    return string.strftime("%Y" "%m" "%d" "%H" "%M" "%S" "%m") + str(
+        random.randint(1000, 9999)
+    )
+
+
+def get_current_mili_time():
+    return int(round(time.time() * 1000))
+
+
+def get_last_milli_time(value):
+    return round(value.timestamp() * 1000)
+
+
+def datetimeToStringDateTime(date, format):
+    return date.strftime(format)
+
+
+def merge_dict(dict1, dict2):
+    "Merge dictionaries and keep values of common keys in list"
+    dict3 = {**dict1, **dict2}
+    for key, value in dict3.items():
+        if key in dict1 and key in dict2:
+            dict3[key] = [value, dict1[key]]
+    return dict3
+
+
+def decode_base64(data, altchars=b"+/"):
+    """Decode base64, padding being optional.
+
+    :param data: Base64 data as an ASCII byte string
+    :returns: The decoded byte string.
+
+    """
+    data = re.sub(rb"[^a-zA-Z0-9%s]+" % altchars, b"", data)  # normalize
+    missing_padding = len(data) % 4
+    if missing_padding:
+        data += b"=" * (4 - missing_padding)
+    return base64.b64decode(data, altchars)
+
+
+def base64_to_content(base64_content):
+    """
+    @params: content (large text) : content of bash64
+        example: "data:audio/ogg;base64,T2dnUwACAAAAAAAAAAC7sXrhAAAAA"
+
+    @return: file with file type
+    """
+    try:
+        content = base64_content.split(",")[1]
+        base64_decode = decode_base64(bytes(content, "utf-8"))
+    except Exception:
+        base64_decode = "No base64 code"
+
+    return base64_decode
+
+
+def smart_truncate(content, length=15, suffix="..."):
+    if len(content) <= length:
+        return content
+    else:
+        return " ".join(content[: length + 1].split(" ")[0:-1]) + suffix
+
+
+def check_date_format(date):
+    if "-" in date:
+        try:
+            return datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            return datetime.strptime(date, "%d-%m-%Y")
+        except Exception:
+            return False
+    elif "/" in date:
+        try:
+            return datetime.strptime(date, "%Y/%m/%d")
+        except ValueError:
+            return datetime.strptime(date, "%d/%m/%Y")
+        except Exception:
+            return False
+    else:
+        return False
